@@ -1,0 +1,20 @@
+services:
+  zhongyue:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: zhongyue
+    ports:
+      - "7777:7777"
+    volumes:
+      - ./backend:/app/backend
+      - ./frontend/dist:/app/frontend/dist:ro
+      - ./music:/music:ro
+      - /var/lib/docker/volumes/zhongyue_zhongyue-data/_data:/app/backend/data
+    environment:
+      - DATABASE_URL=sqlite+aiosqlite:///./data/zhongyue.db
+      - MUSIC_PATHS=/music
+      - SECRET_KEY=change-me-in-production-use-strong-random-key
+      - DEBUG=false
+      - SCAN_ON_STARTUP=false
+    restart: unless-stopped
