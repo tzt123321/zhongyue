@@ -1,0 +1,17 @@
+{
+  "name": "众乐",
+  "short_name": "众乐",
+  "description": "自托管音乐流媒体平台",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#1d4ed8",
+  "icons": [
+    {
+      "src": "/music-placeholder.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+FROM alpine:latest
+RUN apk add --no-cache ca-certificates tzdata
+COPY zhongyue-stream /app/stream
+EXPOSE 8081
+CMD ["/app/stream"]

@@ -1,0 +1,52 @@
+# 众乐 (ZhongYue) — 简化版 Docker 镜像
+# 单阶段构建，无需手动预编译
+
+FROM golang:1.22-alpine AS builder
+
+WORKDIR /app
+
+# 安装 git（go mod download 需要）
+RUN apk add --no-cache git
+
+# 设置 Go 代理（加速国内下载）
+ENV GOPROXY=https://goproxy.cn,direct
+ENV CGO_ENABLED=0
+
+# 复制依赖文件并下载
+COPY go.mod go.sum ./
+RUN go mod download
+
+# 复制全部源码并编译
+COPY . .
+RUN go build -ldflags="-w -s" -o zhongyue-api ./cmd/api && \
+    go build -ldflags="-w -s" -o stream ./cmd/stream && \
+    go build -ldflags="-w -s" -o migrate ./cmd/migrate
+
+# ── 运行阶段 ────────────────────────────────────────────────────────────────
+FROM alpine:3.19
+
+WORKDIR /app
+
+RUN apk add --no-cache ca-certificates tzdata wget curl
+
+# 复制编译好的二进制文件
+COPY --from=builder /app/zhongyue-api /app/
+COPY --from=builder /app/stream /app/
+COPY --from=builder /app/migrate /app/
+
+ENV TZ=Asia/Shanghai
+
+# 入口脚本：迁移数据库 → 启动 API
+COPY <<'EOF' /entrypoint.sh
+#!/bin/sh
+set -e
+echo "[zhongyue] Running database migrations..."
+/app/migrate
+echo "[zhongyue] Starting API service..."
+exec /app/zhongyue-api "$@"
+EOF
+RUN chmod +x /entrypoint.sh
+
+EXPOSE 7800 8081
+
+ENTRYPOINT ["/entrypoint.sh"]

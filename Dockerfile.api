@@ -1,0 +1,38 @@
+# 众乐 (ZhongYue) — API 镜像（包含 migrate，entrypoint 自动建表）
+FROM alpine:3.19
+
+RUN apk add --no-cache ca-certificates tzdata wget curl postgresql-client
+
+WORKDIR /app
+
+# 复制所有二进制
+COPY zhongyue-api /app/zhongyue-api
+COPY zhongyue-stream /app/stream
+COPY migrate /app/migrate
+
+ENV TZ=Asia/Shanghai
+
+# Entrypoint：先运行 migrate 建表/初始化，再启动 API
+COPY <<'EOF' /entrypoint.sh
+#!/bin/sh
+set -e
+echo "[Entrypoint] Running database migrations..."
+# Pre-migration: fix forum_comments from track_id to post_id if needed
+DBHOST=${DB_HOST:-postgres}
+DBPORT=${DB_PORT:-5432}
+DBUSER=${DB_USER:-zhongyue}
+DBNAME=${DB_NAME:-zhongyue}
+DBPASS=${DB_PASSWORD:-zhongyue_secret_pass}
+
+( PGPASSWORD=$DBPASS psql -h $DBHOST -p $DBPORT -U $DBUSER -d $DBNAME -c "ALTER TABLE forum_comments ADD COLUMN IF NOT EXISTS post_id INTEGER REFERENCES forum_posts(id) ON DELETE CASCADE;" ) || true
+( PGPASSWORD=$DBPASS psql -h $DBHOST -p $DBPORT -U $DBUSER -d $DBNAME -c "ALTER TABLE forum_comments DROP COLUMN IF EXISTS track_id;" ) || true
+echo "[Entrypoint] Pre-migration done, running migrate..."
+/app/migrate
+echo "[Entrypoint] Starting API server..."
+exec /app/zhongyue-api "$@"
+EOF
+RUN chmod +x /entrypoint.sh
+
+EXPOSE 7800 8081
+
+ENTRYPOINT ["/entrypoint.sh"]
